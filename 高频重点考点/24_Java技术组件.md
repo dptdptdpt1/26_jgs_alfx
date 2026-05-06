@@ -6,6 +6,7 @@
 2. 问组件之间的交互关系，如 Servlet 如何调用 EJB、JNDI 如何查找资源。
 3. 问分层架构：表现层、业务层、集成层各由什么组件承担。
 4. 问技术选型：EJB vs JavaBean、RMI vs JMS 的区别和适用场景。
+5. 问容器职责：Web Container、EJB Container、Application Server 分别管理什么。
 
 ## 针对考法梳理知识点
 
@@ -18,10 +19,10 @@ J2EE 采用多层架构，每层由不同组件承担：
   浏览器、Applet、Java 应用客户端
       ↓
 Web 层（Web Tier）
-  JSP、Servlet、JavaBean
+  JSP、Servlet、JavaBean（辅助封装数据或简单逻辑）
       ↓
 业务层（Business Tier）
-  EJB、JavaBean（业务逻辑）
+  EJB（Session Bean、Message-Driven Bean、Entity Bean）
       ↓
 集成层/资源层（Integration Tier）
   JDBC、JMS、JCA、JTA → 数据库、消息系统、外部系统
@@ -32,6 +33,27 @@ Web 层（Web Tier）
 - Web Container：管理 JSP 和 Servlet 的生命周期和请求分发。
 - EJB Container：管理 EJB 的生命周期、事务、安全和并发。
 - Application Server：包含 Web Container 和 EJB Container，提供完整的 J2EE 运行环境（如 WebLogic、WebSphere、JBoss）。
+
+### J2EE 架构图位置速判
+
+架构图填空题优先按“组件放在哪一层、由哪个容器管理、承担什么职责”判断。
+
+| 图中位置 | 常见组件 | 容器或环境 | 职责 |
+| --- | --- | --- | --- |
+| 客户端层 | Browser、Applet、Application Client | 浏览器或客户端 JVM | 发起请求、展示结果 |
+| Web 层 | JSP、Servlet、JavaBean | Web Container | 页面展示、请求控制、会话管理 |
+| 业务层 | Session Bean、Entity Bean、Message-Driven Bean | EJB Container | 业务逻辑、事务、安全、异步消息处理 |
+| 集成层 | JDBC、JMS、JCA | Application Server 提供连接和资源管理 | 访问数据库、消息系统、外部企业系统 |
+| 支撑服务 | JNDI、JTA、RMI/IIOP | Application Server | 资源查找、事务管理、远程调用 |
+| 资源层 | Database、JMS Provider、ERP、Legacy System | 外部资源 | 持久化、消息传递、遗留系统能力 |
+
+常见判题规则：
+
+- JSP 和 Servlet 放 Web Container。
+- EJB 放 EJB Container。
+- JDBC 连接数据库，JMS 连接消息服务，JCA 连接企业信息系统。
+- JNDI 不是业务组件，它负责按名称查找 EJB、DataSource、JMS 资源。
+- JTA 不是数据访问组件，它负责事务边界和跨资源事务协调。
 
 ### JSP
 
@@ -69,14 +91,17 @@ Servlet 是 Java Web 的基础，Spring MVC 的 DispatcherServlet 本质上就�
 
 JavaBean 是符合特定规范的 Java 类：私有属性、公有 getter/setter、可序列化、无参构造。
 
-在 J2EE 中的两种角色：
+在 J2EE 中常见角色：
 
 | 角色 | 位置 | 作用 |
 | --- | --- | --- |
-| 实体 Bean | 各层 | 封装数据，在各层之间传递数据（DTO/VO） |
-| 会话 Bean | 业务层 | 封装业务逻辑，早期版本中承担部分 EJB 的职责 |
+| 表单 Bean | Web 层 | 封装页面提交数据 |
+| 数据 Bean | 各层之间 | 封装数据，在层间传递 DTO/VO |
+| 辅助 Bean | Web 层或业务层 | 封装简单处理逻辑 |
 
-案例中如果问"JavaBean 和 EJB 的区别"：JavaBean 是普通 Java 类，EJB 是运行在 EJB Container 中的、由容器管理生命周期和企业级服务的组件。
+案例中如果问"JavaBean 和 EJB 的区别"：JavaBean 是普通 Java 类，不由 EJB Container 管理；EJB 是运行在 EJB Container 中的企业级组件，由容器提供事务、安全、并发和远程调用等服务。
+
+易混点：Session Bean、Entity Bean、Message-Driven Bean 是 EJB 类型，不是普通 JavaBean 的分类。
 
 ### EJB
 
@@ -282,10 +307,9 @@ Web Container（Tomcat/WebLogic）
         ↓ 调用
       EJB Container（Application Server 内置）
         ├── Session Bean（业务逻辑）
-        │     ↓ 通过 JNDI 查找
-        │   JTA（分布式事务）
-        │     ↓
-        │   JDBC / JCA（访问数据库 / 外部系统）
+        │     ├── 通过 JNDI 查找 DataSource / JMS / EJB
+        │     ├── 通过 JTA 管理事务
+        │     └── 通过 JDBC / JCA 访问数据库或外部系统
         └── Message-Driven Bean（异步消费 JMS 消息）
               ↑
             JMS（消息队列）
@@ -298,23 +322,23 @@ Web Container（Tomcat/WebLogic）
 3. Session Bean → JDBC：数据库操作。
 4. Session Bean → JMS：发送异步消息。
 5. JMS → Message-Driven Bean：异步消费消息。
-6. JTA：跨 JDBC + JMS 的分布式事务。
+6. JTA：管理本地事务或跨 JDBC + JMS 的分布式事务。
 7. JCA：连接外部遗留系统。
 
 ### J2EE 与现代框架的对应关系
 
-案例分析中可能会问"传统 J2EE 和 Spring 的关系"：
+案例分析中可能会问"传统 J2EE 和 Spring 的关系"。下面是粗略类比，不是一一替代关系：
 
 | J2EE 组件 | 现代对应 | 说明 |
 | --- | --- | --- |
 | Servlet | Spring MVC DispatcherServlet | Spring MVC 本质上是 Servlet |
 | JSP | Thymeleaf / 前端框架 | 模板引擎或前后端分离 |
 | EJB Session Bean | Spring Bean / Spring Service | Spring 通过 IoC 容器管理 Bean，取代 EJB 的重量级容器 |
-| JNDI | Spring IoC / Nacos | 依赖注入取代 JNDI 查找 |
+| JNDI | Spring IoC / 配置中心 | 依赖注入和配置管理减少硬编码资源查找 |
 | JDBC | MyBatis / JPA / Hibernate | ORM 框架简化数据库操作 |
 | JMS | Spring AMQP / Spring Kafka | Spring 封装了消息队列操作 |
-| JTA | Spring 事务管理 / Seata | Spring 声明式事务取代 JTA，分布式事务用 Seata |
-| JCA | Spring Integration | Spring 集成框架 |
+| JTA | Spring 事务管理 | Spring 可管理本地事务，也可接入 JTA 管理分布式事务 |
+| JCA | 连接器 / 集成框架 | JCA 偏企业信息系统连接标准，现代项目常用专用 SDK 或集成框架 |
 | Application Server | Spring Boot + 内嵌 Tomcat | 无需重量级应用服务器 |
 
-案例中如果问"为什么从 J2EE 迁移到 Spring"：Spring 通过轻量级 IoC 容器和 AOP 机制，用更简单的方式实现了 EJB 的核心能力（事务、安全、远程调用），降低了对重量级 Application Server 的依赖，开发和部署更灵活。
+案例中如果问"为什么从 J2EE 迁移到 Spring"：Spring 通过轻量级 IoC 容器和 AOP 机制，用更简单的方式承载业务对象和声明式事务，降低了对重量级 Application Server 的依赖，开发和部署更灵活。
