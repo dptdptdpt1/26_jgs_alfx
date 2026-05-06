@@ -298,21 +298,77 @@ Application Server 提供完整的 J2EE 运行环境，包含 Web Container 和 
 
 ### 组件交互全景图
 
-```
-浏览器
-  ↓ HTTP
-Web Container（Tomcat/WebLogic）
-  ├── JSP（页面渲染）
-  └── Servlet（请求控制）
-        ↓ 调用
-      EJB Container（Application Server 内置）
-        ├── Session Bean（业务逻辑）
-        │     ├── 通过 JNDI 查找 DataSource / JMS / EJB
-        │     ├── 通过 JTA 管理事务
-        │     └── 通过 JDBC / JCA 访问数据库或外部系统
-        └── Message-Driven Bean（异步消费 JMS 消息）
-              ↑
-            JMS（消息队列）
+```mermaid
+flowchart TB
+    subgraph Client["客户端层 Client Tier"]
+        Browser["浏览器 Browser"]
+        Applet["Applet<br/>早期浏览器中的 Java 小程序"]
+        AppClient["Java Application Client<br/>Java 客户端程序"]
+    end
+
+    subgraph AppServer["应用服务器 Application Server<br/>提供容器和公共企业服务"]
+        subgraph WebContainer["Web 容器 Web Container<br/>如 Tomcat / Jetty / WebLogic Web Container"]
+            Servlet["Servlet<br/>控制器：接收请求 / 流程控制"]
+            JSP["JSP<br/>视图：页面展示"]
+            JavaBean["JavaBean<br/>封装表单数据 / DTO / 辅助逻辑"]
+        end
+
+        subgraph EJBContainer["EJB 容器 EJB Container"]
+            SessionBean["Session Bean<br/>业务逻辑处理"]
+            EntityBean["Entity Bean<br/>旧式持久化组件<br/>后来多被 JPA 取代"]
+            MDB["Message-Driven Bean<br/>异步消息消费者"]
+        end
+
+        subgraph Services["公共服务 / 企业服务"]
+            JNDI["JNDI<br/>命名与目录服务<br/>查找 EJB / DataSource / JMS"]
+            JTA["JTA<br/>事务管理"]
+            Security["Security<br/>认证 / 授权"]
+            RMI["RMI / IIOP<br/>远程调用"]
+        end
+    end
+
+    subgraph Integration["集成层 / 资源访问层"]
+        JDBC["JDBC<br/>数据库访问"]
+        JMS["JMS<br/>消息服务接口"]
+        JCA["JCA<br/>连接企业信息系统"]
+    end
+
+    subgraph Resource["资源层 / 外部系统"]
+        DB["Database<br/>数据库"]
+        JMSProvider["JMS Provider<br/>消息中间件 / 消息队列"]
+        EIS["EIS / ERP / CRM / Legacy System<br/>企业信息系统 / 遗留系统"]
+    end
+
+    Browser -->|HTTP 请求| Servlet
+    Browser -->|HTTP 请求 JSP| JSP
+    Applet -->|HTTP / RMI| Servlet
+    AppClient -->|RMI / IIOP| SessionBean
+
+    Servlet -->|转发| JSP
+    Servlet -->|封装请求数据| JavaBean
+    JSP -->|读取展示数据| JavaBean
+
+    Servlet -->|调用业务逻辑| SessionBean
+
+    SessionBean -->|访问持久化对象| EntityBean
+    SessionBean -->|访问数据库| JDBC
+    SessionBean -->|发送消息| JMS
+    SessionBean -->|访问企业系统| JCA
+
+    JMS --> JMSProvider
+    JMSProvider -->|推送消息| MDB
+    MDB -->|调用业务逻辑| SessionBean
+
+    JDBC --> DB
+    JCA --> EIS
+
+    Servlet -.资源查找.-> JNDI
+    SessionBean -.资源查找.-> JNDI
+    SessionBean -.事务控制.-> JTA
+    EJBContainer -.安全控制.-> Security
+    WebContainer -.安全控制.-> Security
+    AppClient -.远程调用.-> RMI
+    RMI -.调用.-> SessionBean
 ```
 
 关键调用链：
